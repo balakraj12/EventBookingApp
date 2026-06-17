@@ -43,3 +43,13 @@ exports.createEvent = async (req, res) => {
         res.status(500).json({ message: 'Server Error', error: error.message });
     }
 };
+
+exports.updateEvent = async (req, res) => {
+    try {
+        const event = await Event.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        if (!event) return res.status(404).json({ message: 'Event not found' });
+        res.json(event);
+    } catch (error) {
+        res.status(500).json({ message: 'Server Error', error: error.message });
+    }
+};
