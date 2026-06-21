@@ -154,3 +154,22 @@ const seedDatabase = async () => {
                 }
             }
         }
+
+         await Booking.insertMany(bookingsData);
+        console.log(`🎫 Inserted ${bookingsData.length} randomized dummy bookings (confirmed, pending, cancelled, paid, not_paid).`);
+
+        console.log('\n🚀 Database seeded successfully!');
+        console.log('-------------------------------------------');
+        console.log('Admin Email: admin@eventora.com');
+        console.log('User Email:  user@eventora.com');
+        console.log('Password for all users: password123');
+        console.log('-------------------------------------------\n');
+
+        process.exit();
+    } catch (error) {
+        console.error('❌ Error seeding data:', error);
+        process.exit(1);
+    }
+};
+
+seedDatabase();
