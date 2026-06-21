@@ -82,3 +82,75 @@ const events = [
         image: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=800'
     }
 ];
+
+const seedDatabase = async () => {
+    try {
+        await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/eventora');
+        console.log('\n✅ MongoDB connection open...');
+
+        await User.deleteMany();
+        await Event.deleteMany();
+        await Booking.deleteMany();
+        console.log('🗑️  Cleared existing data.');
+
+        // Hash user passwords
+        const salt = await bcrypt.genSalt(10);
+        const hashedUsers = users.map(u => ({
+            ...u,
+            password: bcrypt.hashSync(u.password, salt),
+            isVerified: true
+        }));
+
+        const createdUsers = await User.insertMany(hashedUsers);
+        const adminUser = createdUsers.find(u => u.role === 'admin');
+        const normalUsers = createdUsers.filter(u => u.role === 'user');
+        console.log(`👤 Created ${createdUsers.length} total dummy users.`);
+
+        // Link events to admin
+        const eventsWithAdmin = events.map(e => ({
+            ...e,
+            availableSeats: e.totalSeats,
+            createdBy: adminUser._id
+        }));
+
+        const createdEvents = await Event.insertMany(eventsWithAdmin);
+        console.log(`🎉 Created ${createdEvents.length} distinct events with Unsplash images.`);
+
+        // Generate Bookings Data
+        const bookingsData = [];
+
+        for (const event of createdEvents) {
+            // Assign 3-6 random users to each event
+            const randomCount = Math.floor(Math.random() * 4) + 3;
+            // Shuffle and pick random users
+            const shuffledUsers = [...normalUsers].sort(() => 0.5 - Math.random());
+            const selectedUsers = shuffledUsers.slice(0, randomCount);
+
+            for (const user of selectedUsers) {
+                // Randomize statuses
+                const statuses = ['pending', 'confirmed', 'cancelled'];
+                const status = statuses[Math.floor(Math.random() * statuses.length)];
+
+                let paymentStatus = 'not_paid';
+                if (status === 'confirmed' && event.ticketPrice > 0) {
+                    // Usually confirmed tickets are marked paid (90% of the time)
+                    paymentStatus = Math.random() > 0.1 ? 'paid' : 'not_paid';
+                } else if (event.ticketPrice === 0) {
+                    paymentStatus = 'paid';
+                }
+
+                bookingsData.push({
+                    userId: user._id,
+                    eventId: event._id,
+                    status: status,
+                    paymentStatus: paymentStatus,
+                    amount: event.ticketPrice
+                });
+
+                // Deduct available seats specifically for confirmed tickets!
+                if (status === 'confirmed') {
+                    event.availableSeats -= 1;
+                    await event.save();
+                }
+            }
+        }
